@@ -42,6 +42,10 @@ def feature_engineering(df):
         df['Is_Partner'] = 0
         
     df['Family_Size'] = df['Is_Partner'] + 1 + df['Kidhome'] + df['Teenhome']
+
+    df['Days_Being_Customer'] = df['Dt_Customer'].apply(lambda x: (pd.Timestamp.now() - x).days)
+
+    df['Total_Offers_Accepted'] = df['AcceptedCmp1'] + df['AcceptedCmp2'] + df['AcceptedCmp3'] + df['AcceptedCmp4'] + df['AcceptedCmp5'] + df['Response']
     
     return df
 
@@ -65,6 +69,27 @@ def scale_features(df, numerical_cols):
     scaled_df = pd.DataFrame(scaled_data, columns=numerical_cols, index=df.index)
     return scaled_df, scaler
 
+def remove_atypical_values(df):
+    """
+    Removes atypical values from the DataFrame.
+    """
+    df = df[df['Year_Birth'] > 1900]
+
+    df = df[~df["Marital_Status"].isin(["Absurd", "YOLO"])]
+
+    df = df[df['Income'] < 150000]
+
+    df = df[df['NumMeatProducts'] < 1250]
+
+    df = df[df['NumWebVisitsMonth'] < 15]
+
+    return df
+
+def transform_atypical_values(df):
+    df["Marital_Status"] = df["Marital_Status"].replace("Alone", "Single")
+
+    return df
+    
 def preprocess_pipeline(df):
     """
     Runs the full preprocessing pipeline.
@@ -72,8 +97,15 @@ def preprocess_pipeline(df):
     # Check missing values
     df = handle_missing_values(df)
     
+    # Remove atypical valuess
+    df = remove_atypical_values(df)
+
+    # Transform atypical values
+    df = transform_atypical_values(df)
+    
     # Feature Engineering
     df = feature_engineering(df)
+
     
     # Define columns for encoding
     categorical_cols = ['Education', 'Marital_Status']
