@@ -1,5 +1,6 @@
 from sklearn.cluster import KMeans, DBSCAN, AgglomerativeClustering
 from sklearn.mixture import GaussianMixture
+
 # Requires scikit-learn-extra
 try:
     from sklearn_extra.cluster import KMedoids
@@ -14,6 +15,7 @@ import seaborn as sns
 import numpy as np
 import pandas as pd
 
+
 def run_clustering_models(X, n_clusters=3, random_state=42):
     """
     Runs multiple clustering algorithms and returns their labels and metrics.
@@ -21,29 +23,30 @@ def run_clustering_models(X, n_clusters=3, random_state=42):
     DBSCAN is handled separately as it determines clusters automatically.
     """
     results = {}
-    
+
     # 1. KMeans
     kmeans = KMeans(n_clusters=n_clusters, random_state=random_state)
     labels_kmeans = kmeans.fit_predict(X)
-    results['KMeans'] = labels_kmeans
-    
+    results["KMeans"] = labels_kmeans
+
     # 2. KMedoids
     if KMedoids:
         kmedoids = KMedoids(n_clusters=n_clusters, random_state=random_state)
         labels_kmedoids = kmedoids.fit_predict(X)
-        results['KMedoids'] = labels_kmedoids
-        
+        results["KMedoids"] = labels_kmedoids
+
     # 3. Agglomerative
     agg = AgglomerativeClustering(n_clusters=n_clusters)
     labels_agg = agg.fit_predict(X)
-    results['Agglomerative'] = labels_agg
-    
+    results["Agglomerative"] = labels_agg
+
     # 4. GMM
     gmm = GaussianMixture(n_components=n_clusters, random_state=random_state)
     labels_gmm = gmm.fit_predict(X)
-    results['GMM'] = labels_gmm
-    
+    results["GMM"] = labels_gmm
+
     return results
+
 
 def run_dbscan(X, eps=0.5, min_samples=5):
     """
@@ -53,52 +56,85 @@ def run_dbscan(X, eps=0.5, min_samples=5):
     labels = dbscan.fit_predict(X)
     return labels
 
+
 def compare_models(X, results_dict):
     """
     Calculates and plots metrics for different models.
     Metrics: Silhouette Score, Davies-Bouldin Index.
     """
     metrics = []
-    
+
     for name, labels in results_dict.items():
         # Filter out noise for DBSCAN if present (-1)
         if len(set(labels)) > 1:
             try:
                 sil = silhouette_score(X, labels)
                 db = davies_bouldin_score(X, labels)
-                metrics.append({'Model': name, 'Silhouette': sil, 'Davies-Bouldin': db})
+                metrics.append({"Model": name, "Silhouette": sil, "Davies-Bouldin": db})
             except ValueError:
                 print(f"Could not calculate metrics for {name}")
-                
+
     if not metrics:
         print("No valid models to compare.")
         return
 
     metrics_df = pd.DataFrame(metrics)
-    
+
     # Visualization
     fig, axes = plt.subplots(1, 2, figsize=(14, 6))
-    
-    sns.barplot(x='Model', y='Silhouette', data=metrics_df, ax=axes[0], hue='Model', palette='viridis', legend=False)
-    axes[0].set_title('Silhouette Score (Higher is better)')
-    
-    sns.barplot(x='Model', y='Davies-Bouldin', data=metrics_df, ax=axes[1], hue='Model', palette='magma', legend=False)
-    axes[1].set_title('Davies-Bouldin Index (Lower is better)')
-    
+
+    sns.barplot(
+        x="Model",
+        y="Silhouette",
+        data=metrics_df,
+        ax=axes[0],
+        hue="Model",
+        palette="viridis",
+        legend=False,
+    )
+    axes[0].set_title("Silhouette Score (Higher is better)")
+
+    sns.barplot(
+        x="Model",
+        y="Davies-Bouldin",
+        data=metrics_df,
+        ax=axes[1],
+        hue="Model",
+        palette="magma",
+        legend=False,
+    )
+    axes[1].set_title("Davies-Bouldin Index (Lower is better)")
+
     plt.tight_layout()
     plt.show()
-    
+
     return metrics_df
 
-def evaluate_clusters_kmeans(X, range_n_clusters):
+
+def evaluate_clusters_kmeans(
+    X, range_n_clusters, include_silhouette=True, ref_cluster=None, n_init=20
+):
     """
-    Evaluates K-Means for different k (Elbow & Silhouette).
+    Evaluates K-Means for different k (Elbow & optionally Silhouette).
+
+    Parameters:
+    -----------
+    X : array-like
+        Data to cluster
+    range_n_clusters : range or list
+        Range of cluster numbers to evaluate
+    include_silhouette : bool, default=True
+        Whether to include silhouette score in the plot
+    ref_cluster : int, optional
+        Number of clusters to mark with a vertical dashed line
+    n_init : int, default=20
+        Number of initializations for KMeans
     """
     inertias = []
     silhouette_scores = []
-    
+
     for k in range_n_clusters:
-        kmeans = KMeans(n_clusters=k, random_state=42)
+        kmeans = KMeans(n_clusters=k, n_init=n_init, random_state=42)
         kmeans.fit(X)
         inertias.append(kmeans.inertia_)
         if k > 1:
@@ -106,50 +142,69 @@ def evaluate_clusters_kmeans(X, range_n_clusters):
             silhouette_scores.append(score)
         else:
             silhouette_scores.append(None)
-            
-    fig, ax1 = plt.subplots(figsize=(10, 6))
 
-    color = 'tab:red'
-    ax1.set_xlabel('Number of Clusters (k)')
-    ax1.set_ylabel('Inertia (Elbow)', color=color)
-    ax1.plot(range_n_clusters, inertias, 'o-', color=color)
-    ax1.tick_params(axis='y', labelcolor=color)
+    if include_silhouette:
+        fig, ax1 = plt.subplots(figsize=(10, 6))
 
-    ax2 = ax1.twinx()  
-    color = 'tab:blue'
-    ax2.set_ylabel('Silhouette Score', color=color)  
-    ax2.plot(range_n_clusters, silhouette_scores, 's-', color=color)
-    ax2.tick_params(axis='y', labelcolor=color)
+        color = "tab:red"
+        ax1.set_xlabel("Number of Clusters (k)")
+        ax1.set_ylabel("Inertia (Elbow)", color=color)
+        ax1.plot(range_n_clusters, inertias, "o-", color=color)
+        ax1.tick_params(axis="y", labelcolor=color)
 
-    plt.title('K-Means Optimization: Elbow & Silhouette')
-    plt.tight_layout()
-    plt.show()
+        ax2 = ax1.twinx()
+        color = "tab:blue"
+        ax2.set_ylabel("Silhouette Score", color=color)
+        ax2.plot(range_n_clusters, silhouette_scores, "s-", color=color)
+        ax2.tick_params(axis="y", labelcolor=color)
 
-def visualize_clusters_pca(X, labels, title='Clusters Visualization (PCA)'):
+        if ref_cluster is not None:
+            ax1.axvline(x=ref_cluster, linestyle="dashed", color="red")
+
+        plt.title("K-Means Optimization: Elbow & Silhouette")
+        plt.tight_layout()
+        plt.show()
+    else:
+        # Only plot inertia (elbow)
+        plt.figure(figsize=(8, 4))
+        plt.plot(range_n_clusters, inertias, marker="o")
+        if ref_cluster is not None:
+            plt.axvline(x=ref_cluster, linestyle="dashed", color="red")
+        plt.title("Evolución de la inercia (Codo)")
+        plt.xlabel("Cantidad de Grupos")
+        plt.ylabel("Inercia")
+        plt.show()
+
+
+def visualize_clusters_pca(X, labels, title="Clusters Visualization (PCA)"):
     """
     Visualizes clusters using PCA (2D).
     """
     pca = PCA(n_components=2)
     X_pca = pca.fit_transform(X)
-    
+
     plt.figure(figsize=(10, 8))
-    sns.scatterplot(x=X_pca[:, 0], y=X_pca[:, 1], hue=labels, palette='viridis', s=50, style=labels)
+    sns.scatterplot(
+        x=X_pca[:, 0], y=X_pca[:, 1], hue=labels, palette="viridis", s=50, style=labels
+    )
     plt.title(title)
-    plt.xlabel('PC1')
-    plt.ylabel('PC2')
-    plt.legend(title='Cluster', bbox_to_anchor=(1.05, 1), loc='upper left')
+    plt.xlabel("PC1")
+    plt.ylabel("PC2")
+    plt.legend(title="Cluster", bbox_to_anchor=(1.05, 1), loc="upper left")
     plt.tight_layout()
     plt.show()
+
 
 def interpret_clusters(df, labels):
     """
     Returns mean values for numeric features by cluster.
     """
     df_clustered = df.copy()
-    df_clustered['Cluster'] = labels
+    df_clustered["Cluster"] = labels
     # Select only numeric columns for groupby mean to avoid errors with new pandas versions
-    numeric_cols = df_clustered.select_dtypes(include=['number']).columns
-    return df_clustered.groupby('Cluster')[numeric_cols].mean()
+    numeric_cols = df_clustered.select_dtypes(include=["number"]).columns
+    return df_clustered.groupby("Cluster")[numeric_cols].mean()
+
 
 def plot_dendrogram(model, **kwargs):
     """
@@ -157,7 +212,7 @@ def plot_dendrogram(model, **kwargs):
     Borrowed from sklearn examples.
     """
     from scipy.cluster.hierarchy import dendrogram
-    
+
     # Create linkage matrix and then plot the dendrogram
     # create the counts of samples under each node
     counts = np.zeros(model.children_.shape[0])
@@ -171,43 +226,46 @@ def plot_dendrogram(model, **kwargs):
                 current_count += counts[child_idx - n_samples]
         counts[i] = current_count
 
-    linkage_matrix = np.column_stack([model.children_, model.distances_,
-                                      counts]).astype(float)
+    linkage_matrix = np.column_stack(
+        [model.children_, model.distances_, counts]
+    ).astype(float)
 
     # Plot the corresponding dendrogram
     dendrogram(linkage_matrix, **kwargs)
+
 
 def plot_knn_distance(X, k=5):
     """
     Plots the k-nearest neighbors distance to help Estimate Epsilon for DBSCAN.
     """
     from sklearn.neighbors import NearestNeighbors
-    
+
     neighbors = NearestNeighbors(n_neighbors=k)
     neighbors_fit = neighbors.fit(X)
     distances, indices = neighbors_fit.kneighbors(X)
-    
+
     # Sort distance values by ascending value and plot
     distances = np.sort(distances, axis=0)
     distances = distances[:, 1]
-    
+
     plt.figure(figsize=(10, 6))
     plt.plot(distances)
-    plt.title(f'K-Nearest Neighbors Distance (k={k})')
-    plt.xlabel('Points sorted by distance')
-    plt.ylabel('Epsilon (Distance to k-th neighbor)')
+    plt.title(f"K-Nearest Neighbors Distance (k={k})")
+    plt.xlabel("Points sorted by distance")
+    plt.ylabel("Epsilon (Distance to k-th neighbor)")
     plt.grid(True)
     plt.show()
+
 
 def optimize_dbscan_grid(X, eps_values, min_samples_values):
     """
     Grid search for DBSCAN hyperparameters and visualizes Silhouette scores in a heatmap.
     """
     from itertools import product
-    
+
     dbscan_params = list(product(eps_values, min_samples_values))
     sil_scores = []
-    
+
     for p in dbscan_params:
         try:
             y_pred = DBSCAN(eps=p[0], min_samples=p[1]).fit_predict(X)
@@ -216,19 +274,98 @@ def optimize_dbscan_grid(X, eps_values, min_samples_values):
             if len(unique_labels) > 1 and len(unique_labels) < len(X):
                 score = silhouette_score(X, y_pred)
             else:
-                score = -1 # Bad score for noise-only or single-cluster results
+                score = -1  # Bad score for noise-only or single-cluster results
             sil_scores.append(score)
         except Exception:
             sil_scores.append(-1)
 
-    df_param_adj = pd.DataFrame.from_records(dbscan_params, columns=['Epsilon', 'MinSamples'])
-    df_param_adj['Score'] = sil_scores
+    df_param_adj = pd.DataFrame.from_records(
+        dbscan_params, columns=["Epsilon", "Vecindad"]
+    )
+    df_param_adj["Score"] = sil_scores
 
-    pivot_data = pd.pivot_table(df_param_adj, values='Score', index='MinSamples', columns='Epsilon')
-    
-    plt.figure(figsize=(12, 8))
-    sns.heatmap(pivot_data, annot=True, fmt='.2f', cmap='coolwarm')
-    plt.title('DBSCAN Silhouette Score Heatmap')
+    pivot_data = pd.pivot_table(
+        df_param_adj, values="Score", index="Vecindad", columns="Epsilon"
+    )
+
+    plt.figure(figsize=(16, 8))
+    sns.heatmap(pivot_data, annot=True, fmt=".2f", cmap="coolwarm")
+    plt.title("DBSCAN Silhouette Score Heatmap")
     plt.show()
-    
+
     return df_param_adj
+
+
+def evaluate_gmm_bic(
+    X, n_components_range, covariance_types=["spherical", "tied", "diag", "full"]
+):
+    """
+    Evaluates Gaussian Mixture Models using BIC across different component numbers and covariance types.
+
+    Parameters:
+    -----------
+    X : array-like
+        Data to cluster
+    n_components_range : range or list
+        Range of component numbers to evaluate
+    covariance_types : list, default=['spherical', 'tied', 'diag', 'full']
+        Types of covariance to evaluate
+    """
+    fig, ax = plt.subplots(figsize=(6, 5))
+
+    for covariance_type in covariance_types:
+        bic_values = []
+        for n_components in n_components_range:
+            model = GaussianMixture(
+                n_components=n_components, covariance_type=covariance_type
+            )
+            model.fit(X)
+            bic_values.append(model.bic(X))
+        ax.plot(n_components_range, bic_values, label=covariance_type)
+
+    ax.set_title("Valor BIC")
+    ax.set_xlabel("Cantidad de Gaussianas")
+    ax.legend()
+    plt.show()
+
+
+def compare_all_models_silhouette(X, labels_dict):
+    """
+    Calculates and prints Silhouette scores for multiple clustering models.
+
+    Parameters:
+    -----------
+    X : array-like
+        Data that was clustered
+    labels_dict : dict
+        Dictionary with model names as keys and cluster labels as values
+        Example: {'KMeans': labels_kmeans, 'Hierarchical': labels_h_clust, ...}
+
+    Returns:
+    --------
+    dict : Dictionary of model names and their silhouette scores
+    """
+    scores = {}
+
+    for model_name, labels in labels_dict.items():
+        try:
+            # Check if there are enough clusters
+            unique_labels = set(labels)
+            if len(unique_labels) > 1 and len(unique_labels) < len(X):
+                score = silhouette_score(X, labels)
+                scores[model_name] = score
+            else:
+                scores[model_name] = None
+        except Exception as e:
+            print(f"Could not calculate silhouette for {model_name}: {e}")
+            scores[model_name] = None
+
+    # Print results
+    print("Silhouette para:")
+    for model_name, score in scores.items():
+        if score is not None:
+            print(f" {model_name}: {score:.4f}")
+        else:
+            print(f" {model_name}: N/A")
+
+    return scores
